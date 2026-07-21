@@ -16,6 +16,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 
+function getStudentDisplayData(record: any, students: any[] = {}) {
+  const nestedStudent = record?.student ?? {};
+  const studentFromList = students.find((s: any) => {
+    const candidateIds = [record?.studentId, record?.student_id, record?.student?.id, s.id, s.userId, s.profileId];
+    const hasMatchingId = candidateIds.some((value) => value && String(value) === String(s.id || record?.studentId || record?.student_id));
+    const matricCandidate = [nestedStudent.matricNumber, nestedStudent.matric, record?.matricNumber, record?.matric, record?.studentMatricNumber, record?.student_matric_number].find(Boolean);
+    const hasMatchingMatric = Boolean(matricCandidate && [s.matricNumber, s.matric, s.matric_number].some((value: string | undefined) => value && String(value).toLowerCase() === String(matricCandidate).toLowerCase()));
+    return hasMatchingId || hasMatchingMatric;
+  });
+
+  const fullName = [nestedStudent.fullName, nestedStudent.name, record?.fullName, record?.studentName, record?.name, record?.student_full_name, studentFromList?.fullName, studentFromList?.name, studentFromList?.full_name].find(Boolean) ?? "—";
+  const matricNumber = [nestedStudent.matricNumber, nestedStudent.matric, record?.matricNumber, record?.matric, record?.studentMatricNumber, record?.student_matric_number, studentFromList?.matricNumber, studentFromList?.matric, studentFromList?.matric_number].find(Boolean) ?? "—";
+  const department = [nestedStudent.department, record?.department, record?.studentDepartment, record?.student_department, studentFromList?.department, studentFromList?.dept].find(Boolean) ?? "—";
+
+  return { fullName, matricNumber, department };
+}
+
 export default function AdminDashboard() {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
@@ -105,8 +122,10 @@ export default function AdminDashboard() {
     if (!session?.isActive) { toast.error("This session is closed"); return; }
 
     try {
-      await api.markAttendance({ sessionId: activeSessionId, matricNumber: matric.trim() });
-      toast.success(`✓ Marked attendance for ${matric.trim()}`);
+      const result = await api.markAttendance({ sessionId: activeSessionId, matricNumber: matric.trim() });
+      const studentInfo = getStudentDisplayData(result, students);
+      const detailText = [studentInfo.fullName, studentInfo.matricNumber].filter((value) => value && value !== "—").join(" • ");
+      toast.success(detailText ? `✓ Marked attendance for ${detailText}` : `✓ Marked attendance for ${matric.trim()}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not mark attendance");
       return;
@@ -270,15 +289,18 @@ export default function AdminDashboard() {
                 {records.length === 0 && (
                   <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No attendance records yet.</TableCell></TableRow>
                 )}
-                {records.map((r: any) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.student?.fullName ?? "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{r.student?.matricNumber ?? "—"}</TableCell>
-                    <TableCell>{r.student?.department ?? "—"}</TableCell>
-                    <TableCell>{r.session?.title ?? "—"}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))}
+                {records.map((r: any) => {
+                  const studentInfo = getStudentDisplayData(r, students);
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{studentInfo.fullName}</TableCell>
+                      <TableCell className="font-mono text-xs">{studentInfo.matricNumber}</TableCell>
+                      <TableCell>{studentInfo.department}</TableCell>
+                      <TableCell>{r.session?.title ?? "—"}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
