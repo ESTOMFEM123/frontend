@@ -11,7 +11,7 @@ async function request(path: string, options: RequestInit = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const url = `${API_BASE_URL}${path}`;
+  const url = `${API_BASE_URL}/api${path}`;
   console.log('[API] Request', options.method || 'GET', url, 'token=', token ? 'yes' : 'no');
 
   let response: Response;
